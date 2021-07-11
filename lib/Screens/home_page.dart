@@ -1,4 +1,7 @@
+import 'package:doctor_app/Models/appointment.dart';
+import 'package:doctor_app/Services/appointments_service.dart';
 import 'package:doctor_app/Utilities/color_constants.dart';
+import 'package:doctor_app/Utilities/loading_widget.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
@@ -14,11 +17,32 @@ class _HomePageState extends State<HomePage> {
   int? initialIndex = 0;
   DateTime? selectedDate;
   String? selectedDateString;
+  bool isLoading = false;
+  List<Appointment> upcomingAppointments = [];
+  List<Appointment> doneAppointments = [];
 
   @override
   void initState() {
     super.initState();
     selectedDateString = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    getAppointmentsRequest();
+  }
+
+  getAppointmentsRequest() async {
+    upcomingAppointments.clear();
+    doneAppointments.clear();
+    setState(() {
+      isLoading = true;
+    });
+    await AppointmentsService().getAppointmentsForADay(selectedDateString!).then((value){
+      for (int i=0 ; i<value.length ; i++){
+        if(value[i].consultationStatus == "UPCOMING") upcomingAppointments.add(value[i]);
+        else doneAppointments.add(value[i]);
+      }
+    });
+    setState(() {
+      isLoading = false;
+    });
   }
 
   void handleClick(String value) {
@@ -99,10 +123,10 @@ class _HomePageState extends State<HomePage> {
                                         selectedDate = await showDatePicker(
                                             context: context,
                                             initialDate: DateTime.now(),
-                                            firstDate: DateTime.now(),
+                                            firstDate: DateTime(2001, 1, 1),
                                             lastDate: DateTime.now().add(Duration(days: 30)));
                                         selectedDateString = DateFormat('dd-MM-yyyy').format(selectedDate!);
-                                        setState(() {});
+                                        getAppointmentsRequest();
                                       },
                                       icon: Icon(Icons.calendar_today_sharp,color: DARK_BLUE,),
                                     ),
@@ -164,12 +188,15 @@ class _HomePageState extends State<HomePage> {
                           Expanded(
                             child: TabBarView(
                               children: [
-                                Container(
-                                  child: Center(
-                                    child: Image.asset("assets/images/no_appointment.png"),
-                                  ),
+                                isLoading ? loader(context,"Getting your appointments") : Container(
+                                  child: upcomingAppointments.isEmpty ? noAppointmentsWidget("upcoming") : Container(
+                                    child: Text(upcomingAppointments.length.toString())
+                                  )
                                 ),
-                                Container(
+                                isLoading ? loader(context,"Getting your appointments") : Container(
+                                    child: doneAppointments.isEmpty ? noAppointmentsWidget("done") : Container(
+                                        child: Text(doneAppointments.length.toString())
+                                    )
                                 ),
                               ],
                             ),
@@ -181,6 +208,19 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             )),
+      ),
+    );
+  }
+
+  Widget noAppointmentsWidget(String type){
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset("assets/images/no_appointment.png"),
+          SizedBox(height: 30.0,),
+          Text("No $type appointments for the day",style: TextStyle(fontSize: 24.0,fontFamily: "opensansbold",color: GREY),)
+        ],
       ),
     );
   }
